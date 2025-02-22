@@ -6,23 +6,21 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 
-
 let camera, scene, renderer;
 let raycaster = false;
 
-
-const SIZE_CASE = 50;
-const MARGE = SIZE_CASE / 2;
-
 const objects = [];
 
-camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 1, 10000);
-camera.position.set(0, 800, 1300);
-camera.lookAt(0, 0, 0);
+const fov = 50;
+camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 1, 100000);
+camera.position.set(200, 400, 200);
+camera.lookAt(new THREE.Vector3(200, 100, 200));
+
+console.log(camera.position)
+
 
 scene = new THREE.Scene();
 scene.background = new THREE.Color(0xf0f0f0);
-
 
 function printGraph(obj) {
   console.group(' <%o> ' + obj.name, obj);
@@ -31,8 +29,6 @@ function printGraph(obj) {
 }
 
 const mat = new THREE.Matrix4().makeScale(50, 50, 50);
-console.log(mat);
-
 
 function loadPiece(li, col, type, color) {
   const loader = new GLTFLoader();
@@ -46,22 +42,15 @@ function loadPiece(li, col, type, color) {
       if (child.isMesh) {
         child.material.color = color === 'white' ? new THREE.Color(0xffffff) : new THREE.Color(0x171616);
         child.geometry.applyMatrix4(mat);
-
-        const helper = new THREE.Box3Helper(child.geometry.boundingBox);
-        scene.add(helper);
-
       }
     });
 
-
-    piece.position.setX(li);
-    piece.position.setY(0);
-    piece.position.setZ(col);
-
+    const bbox = new THREE.Box3().setFromObject(piece);
+    const height = bbox.max.y - bbox.min.y;
+    piece.position.set(li, height / 2 + 10, col);
 
     scene.add(piece);
     objects.push(piece);
-
 
   }, undefined, function (error) {
     console.error(error);
@@ -69,41 +58,41 @@ function loadPiece(li, col, type, color) {
 
 }
 
-// for (let li = 0; li < 8; li++) {
-//   for (let col = 0; col < 8; col++) {
-//     if (col === 1) {
-//       loadPiece(li * SIZE_CASE + MARGE, MARGE, "pawn", "black");
-//     }
-//     if (col === 6) {
-//       loadPiece(li * SIZE_CASE + MARGE, col * SIZE_CASE + MARGE, "pawn", "white");
-//     }
+// king + 10
+// knight + 10
+// queen + 10
+// pawn + 10
+// bishop + 7
+// rook + 5
 
-//   }
-// }
-
-loadPiece(0 * SIZE_CASE + MARGE, 7 * SIZE_CASE + MARGE, "rook", "white");
-// loadPiece(1 * SIZE_CASE + MARGE, 7 * SIZE_CASE + MARGE, "knight", "white");
-// loadPiece(2 * SIZE_CASE + MARGE, 7 * SIZE_CASE + MARGE, "bishop", "white");
-// loadPiece(3 * SIZE_CASE + MARGE, 7 * SIZE_CASE + MARGE, "queen", "white");
-// loadPiece(4 * SIZE_CASE + MARGE, 7 * SIZE_CASE + MARGE, "king", "white");
-// loadPiece(5 * SIZE_CASE + MARGE, 7 * SIZE_CASE + MARGE, "bishop", "white");
-// loadPiece(6 * SIZE_CASE + MARGE, 7 * SIZE_CASE + MARGE, "knight", "white");
-// loadPiece(7 * SIZE_CASE + MARGE, 7 * SIZE_CASE + MARGE, "rook", "white");
-
-// loadPiece(0 * SIZE_CASE + MARGE, -1 * SIZE_CASE + MARGE, "rook", "black");
-// loadPiece(1 * SIZE_CASE + MARGE, -1 * SIZE_CASE + MARGE, "knight", "black");
-// loadPiece(2 * SIZE_CASE + MARGE, -1 * SIZE_CASE + MARGE, "bishop", "black");
-// loadPiece(3 * SIZE_CASE + MARGE, -1 * SIZE_CASE + MARGE, "queen", "black");
-// loadPiece(4 * SIZE_CASE + MARGE, -1 * SIZE_CASE + MARGE, "king", "black");
-// loadPiece(5 * SIZE_CASE + MARGE, -1 * SIZE_CASE + MARGE, "bishop", "black");
-// loadPiece(6 * SIZE_CASE + MARGE, -1 * SIZE_CASE + MARGE, "knight", "black");
-// loadPiece(7 * SIZE_CASE + MARGE, -1 * SIZE_CASE + MARGE, "rook", "black");
+loadPiece(0, 0, "pawn", "white");
 
 
-// grid
+const geometry = new THREE.BoxGeometry(50, 25, 50);
+const textureLoader = new THREE.TextureLoader();
 
-const gridHelper = new THREE.GridHelper(1000, 20);
-scene.add(gridHelper);
+const whiteTexture = textureLoader.load('assets/textures/caseBlanche.png');
+const blackTexture = textureLoader.load('assets/textures/caseNoire.png');
+
+const texturedMaterialWhite = new THREE.MeshBasicMaterial({ map: whiteTexture });
+const texturedMaterialBlack = new THREE.MeshBasicMaterial({ map: blackTexture });
+
+function createCase(position, isBlack) {
+  const material = isBlack ? texturedMaterialBlack : texturedMaterialWhite;
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.copy(position);
+  scene.add(mesh);
+  return mesh;
+}
+
+const cases = [];
+for (let i = 0; i < 8; i++) {
+  for (let j = 0; j < 8; j++) {
+    const isBlack = (i + j) % 2 !== 0;
+    const position = new THREE.Vector3(i * 50, 0, j * 50);
+    cases.push(createCase(position, isBlack));
+  }
+}
 
 // raycaster
 
@@ -128,60 +117,49 @@ document.body.appendChild(renderer.domElement);
 document.addEventListener('pointerdown', onPointerDown);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-// controls.listenToKeyEvents(window); // optional
-
-
+controls.listenToKeyEvents(window); // optional
+controls.target.set(200, 0, 200);
+camera.position.set(200, 550, 200);
+camera.lookAt(new THREE.Vector3(200, 0, 200));
 
 /******************************** EVENT ***************************** */
 
 function onPointerDown(event) {
   controls.enabled = false;
+  console.log(camera.position)
 
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
 
   raycaster.setFromCamera(mouse, camera);
 
-  const intersects = raycaster.intersectObjects(objects, true);
-
-  console.log(mouse.x, mouse.y);
-
-  console.table(objects);
+  const intersects = raycaster.intersectObjects(cases);
 
   if (intersects.length > 0) {
 
     const intersect = intersects[0];
 
     console.log("------------------ intersection ------------------");
-    printGraph(intersect.object);
-    intersect.object.material.color = new THREE.Color(0xff0000);
+    // printGraph(intersect.object);
+    const position = intersect.object.position;
+    console.log('Position de la case cliquée :', position);
+    // intersect.object.material.color = new THREE.Color(0xff0000);
 
   }
-
   controls.enabled = true;
-
 }
 
-
 const animation = () => {
-
-  renderer.setAnimationLoop(animation); // requestAnimationFrame() replacement, compatible with XR 
-
+  renderer.setAnimationLoop(animation);
   renderer.render(scene, camera);
 };
-
-
-
 
 animation();
 
 window.addEventListener('resize', onWindowResize, false);
 
 function onWindowResize() {
-
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-
   renderer.setSize(window.innerWidth, window.innerHeight);
-
 }
