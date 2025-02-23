@@ -62,6 +62,13 @@ audioLoader.load('assets/audio/monster.wav', function (buffer) {
   clickSound.setVolume(1.0);
 });
 
+const hitSound = new THREE.Audio(listener);
+audioLoader.load('assets/audio/hit.mp3', function (buffer) {
+  hitSound.setBuffer(buffer);
+  hitSound.setVolume(1.0);
+});
+
+
 /** ************** RAYCASTER ************** */
 let raycaster = new THREE.Raycaster();
 let mouse = new THREE.Vector2(1, 1);
@@ -83,45 +90,95 @@ const objects = loadAllPieces(scene);
 
 /******************************** CLICK ***************************** */
 
+
+let selectedPiece;
+let originColor;
+
+function animateJump(object) {
+  gsap.to(object.position, {
+    y: object.position.y + 10,
+    duration: 0.3,
+    yoyo: true,
+    repeat: 1,
+    ease: "power1.inOut"
+  });
+}
+
 function onPointerDown(event) {
   controls.enabled = false;
+
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+
   raycaster.setFromCamera(mouse, camera);
 
-  const intersects = raycaster.intersectObjects(cases, true);
-
-  if (intersects.length > 0) {
-    const intersect = intersects[0];
-    console.log("------------------ CASE ------------------");
-    // printGraph(intersect.object);
-    const position = intersect.object.position;
-    console.log('Position de la case cliquée :', position);
-  }
+  // CLICK SUR UNE PIECE
 
   const intersectsO = raycaster.intersectObjects(objects);
 
   if (intersectsO.length > 0) {
-    const intersect = intersectsO[0];
     console.log("------------------ PIECE ------------------");
+    const intersect = intersectsO[0];
     let parent = intersect.object;
+
     while (parent.parent && parent.parent.type !== "Scene") {
       parent = parent.parent;
     }
     const position = parent.position;
     console.log('Position de la piece cliqué :', position);
-    
-    intersect.object.material.color = new THREE.Color(0xff0000);
-    if (!clickSound.isPlaying) {
-      clickSound.play();
+
+    if ( selectedPiece && selectedPiece.position !== parent.position ) {
+      console.log("------------- MIAM PIECE -----------------");
+      
+      if (objects.includes(parent)) {
+        const index = objects.indexOf(parent);
+        if (index > -1) {
+          objects.splice(index, 1);
+          scene.remove(parent);
+        }
+      }
+      if (!hitSound.isPlaying) {
+        hitSound.play();
+      }
+      selectedPiece.position.set(position.x, selectedPiece.position.y, position.z);
+      selectedPiece.traverse(child => {
+        if (child.isMesh) {
+          child.material.color.set(originColor);
+        }
+      });
+      selectedPiece = null;
     }
+    else {
+      originColor = intersect.object.material.color.getHex();;
+      intersect.object.material.color.set(0x2edc12);  
+      selectedPiece = parent;
+      if (!clickSound.isPlaying) {
+        clickSound.play();
+      }
+      animateJump(selectedPiece);
+    }
+    return;
+  }
 
-    // parent.position.set(0,parent.position.y,0)
+  // CLICK SUR UNE CASE
 
+  const intersects = raycaster.intersectObjects(cases);
+  if (intersects.length > 0 && selectedPiece) {
+    const intersect = intersects[0];
+    const position = intersect.object.position;
+    console.log("------------------ CASE ------------------");
+    console.log('Position de la case cliqué :', position);
+
+    selectedPiece.position.set(position.x, selectedPiece.position.y, position.z);
+    selectedPiece.traverse(child => {
+      if (child.isMesh) {
+        child.material.color.set(originColor);
+      }
+    });
+    selectedPiece = null;
   }
   controls.enabled = true;
 }
-
 
 /** ************************** UTILS ***************************** */
 const animation = () => {

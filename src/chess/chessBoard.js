@@ -50,6 +50,16 @@ export function loadPiece(scene, objects, li, col, type, isBlack) {
       const bbox = new THREE.Box3().setFromObject(piece);
       const height = bbox.max.y - bbox.min.y;
       piece.position.set(col, height / 2 + 10, li);
+
+      if (type === 'knight') {
+        if (isBlack) {
+            piece.rotation.y = Math.PI/2; 
+        }
+        else {
+            piece.rotation.y = -Math.PI/2; 
+        }
+      }
+
       scene.add(piece);
       objects.push(piece);
   
@@ -64,5 +74,27 @@ export function loadAllPieces(scene) {
         loadPiece(scene, objects, 50, 50 * i, "pawn", true);
         loadPiece(scene, objects, 50 * 6, 50 * i, "pawn", false);
     }
+    const liBlack = 0;
+    const liWhite = 7 * 50;
+    loadPiece(scene, objects, liBlack, 0, "rook", true);
+    loadPiece(scene, objects, liBlack, 7 * 50, "rook", true);
+    loadPiece(scene, objects, liWhite, 0, "rook", false);
+    loadPiece(scene, objects, liWhite, 7 * 50, "rook", false);
+
+    loadPiece(scene, objects, liBlack, 1 * 50, "knight", true);
+    loadPiece(scene, objects, liBlack, 6 * 50, "knight", true);
+    loadPiece(scene, objects, liWhite, 1 * 50, "knight", false);
+    loadPiece(scene, objects, liWhite, 6 * 50, "knight", false);
+
+    loadPiece(scene, objects, liBlack, 2 * 50, "bishop", true);
+    loadPiece(scene, objects, liWhite, 2 * 50, "bishop", false);
+    loadPiece(scene, objects, liBlack, 5 * 50, "bishop", true);
+    loadPiece(scene, objects, liWhite, 5 * 50, "bishop", false);
+
+    loadPiece(scene, objects, liBlack, 3 * 50, "queen", true);
+    loadPiece(scene, objects, liWhite, 3 * 50, "queen", false);
+    loadPiece(scene, objects, liBlack, 4 * 50, "king", true);
+    loadPiece(scene, objects, liWhite, 4 * 50, "king", false);
+
     return objects;
 }
