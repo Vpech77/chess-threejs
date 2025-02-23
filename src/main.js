@@ -1,218 +1,207 @@
 "use strict";
 
 import * as THREE from 'three';
-
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { createChessboard, loadAllPieces } from './chess/chessBoard.js';
+
+/******************************** INITIALISATION SCENE ***************************** */
 
 let camera, scene, renderer;
-let plane;
-let pointer, raycaster, isShiftDown = false;
+scene = new THREE.Scene();
 
-let rollOverMesh, rollOverMaterial;
-let cubeGeo, cubeMaterial;
+/** ************** FOG ************** */
+const fogColor = 0xf0f0f0;
+const near = 10;
+const far = 1000; 
+scene.fog = new THREE.Fog(fogColor, near, far);
+scene.background = new THREE.Color(fogColor);
 
-const objects = [];
+/** ************** LIGHT ************** */
+const ambientLight = new THREE.AmbientLight(0x606060, 3);
+scene.add(ambientLight);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
+directionalLight.position.set(1, 0.75, 0.5).normalize();
+scene.add(directionalLight);
 
-init();
-render();
+/** ************** RENDERER ************** */
+renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+document.addEventListener('pointerdown', onPointerDown);
 
-function init() {
+/** ************** CAMERA AND CONTROLS ************** */
+const fov = 45;
+camera = new THREE.PerspectiveCamera(fov, window.innerWidth / window.innerHeight, 1, 100000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.listenToKeyEvents(window);
+controls.target.set(200, 0, 200);
+camera.position.set(200, 500, 500);
+camera.lookAt(new THREE.Vector3(200, 0, 200));
 
-  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
-  camera.position.set(400, 800, 1300);
-  camera.lookAt(0, 0, 0);
+/** ************** SOUND ************** */
+const listener = new THREE.AudioListener();
+camera.add(listener);
+const audioLoader = new THREE.AudioLoader();
 
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf0f0f0);
+const backgroundMusic = new THREE.Audio(listener);
+audioLoader.load('assets/audio/whiteNoise.mp3', function (buffer) {
+  backgroundMusic.setBuffer(buffer);
+  backgroundMusic.setLoop(true);
+  backgroundMusic.setVolume(0.5);
+  document.addEventListener('click', function () {
+    if (!backgroundMusic.isPlaying) {
+      backgroundMusic.play();
+    }
+  });
+});
 
-  // roll-over helpers
+const clickSound = new THREE.Audio(listener);
+audioLoader.load('assets/audio/monster.wav', function (buffer) {
+  clickSound.setBuffer(buffer);
+  clickSound.setVolume(1.0);
+});
 
-  const rollOverGeo = new THREE.BoxGeometry(50, 50, 50);
-  rollOverMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, opacity: 0.5, transparent: true });
-  rollOverMesh = new THREE.Mesh(rollOverGeo, rollOverMaterial);
-  scene.add(rollOverMesh);
-
-  // cubes
-
-  const map = new THREE.TextureLoader().load('assets/textures/square-outline-textured.png');
-  map.colorSpace = THREE.SRGBColorSpace;
-  cubeGeo = new THREE.BoxGeometry(50, 50, 50);
-  cubeMaterial = new THREE.MeshLambertMaterial({ color: 0xfeb74c, map: map });
-
-  // grid
-
-  const gridHelper = new THREE.GridHelper(1000, 20);
-  scene.add(gridHelper);
-
-  //
-
-  raycaster = new THREE.Raycaster();
-  pointer = new THREE.Vector2();
-
-  const geometry = new THREE.PlaneGeometry(1000, 1000);
-  geometry.rotateX(- Math.PI / 2);
-
-  plane = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ visible: false }));
-  scene.add(plane);
-
-  objects.push(plane);
-
-  // lights
-
-  const ambientLight = new THREE.AmbientLight(0x606060, 3);
-  scene.add(ambientLight);
-
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
-  directionalLight.position.set(1, 0.75, 0.5).normalize();
-  scene.add(directionalLight);
-
-  renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
-
-  document.addEventListener('pointermove', onPointerMove);
-  document.addEventListener('pointerdown', onPointerDown);
-  document.addEventListener('keydown', onDocumentKeyDown);
-  document.addEventListener('keyup', onDocumentKeyUp);
+const hitSound = new THREE.Audio(listener);
+audioLoader.load('assets/audio/hit.mp3', function (buffer) {
+  hitSound.setBuffer(buffer);
+  hitSound.setVolume(1.0);
+});
 
 
-  const controls = new OrbitControls(camera, renderer.domElement);
-  // controls.listenToKeyEvents(window); // optional
+/** ************** RAYCASTER ************** */
+let raycaster = new THREE.Raycaster();
+let mouse = new THREE.Vector2(1, 1);
 
 
+/******************************** INITIALISATION PLATO ***************************** */
 
-  window.addEventListener('resize', onWindowResize);
-
-}
-
-
-
-
-function onWindowResize() {
-
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-
-  renderer.setSize(window.innerWidth, window.innerHeight);
-
-  render();
-
-}
+// king + 10
+// knight + 10
+// queen + 10
+// pawn + 10
+// bishop + 7
+// rook + 5
 
 
+const cases = createChessboard(scene);
+const objects = loadAllPieces(scene);
 
-/******************************** EVENT ***************************** */
 
-function onPointerMove(event) {
+/******************************** CLICK ***************************** */
 
-  pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
 
-  raycaster.setFromCamera(pointer, camera);
+let selectedPiece;
+let originColor;
 
-  const intersects = raycaster.intersectObjects(objects, false);
-
-  if (intersects.length > 0) {
-
-    const intersect = intersects[0];
-
-    rollOverMesh.position.copy(intersect.point).add(intersect.face.normal);
-    rollOverMesh.position.divideScalar(50).floor().multiplyScalar(50).addScalar(25);
-
-    render();
-
-  }
-
+function animateJump(object) {
+  gsap.to(object.position, {
+    y: object.position.y + 10,
+    duration: 0.3,
+    yoyo: true,
+    repeat: 1,
+    ease: "power1.inOut"
+  });
 }
 
 function onPointerDown(event) {
+  controls.enabled = false;
 
-  pointer.set((event.clientX / window.innerWidth) * 2 - 1, - (event.clientY / window.innerHeight) * 2 + 1);
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
 
-  raycaster.setFromCamera(pointer, camera);
+  raycaster.setFromCamera(mouse, camera);
 
-  const intersects = raycaster.intersectObjects(objects, false);
+  // CLICK SUR UNE PIECE
 
-  if (intersects.length > 0) {
+  const intersectsO = raycaster.intersectObjects(objects);
 
-    const intersect = intersects[0];
+  if (intersectsO.length > 0) {
+    console.log("------------------ PIECE ------------------");
+    const intersect = intersectsO[0];
+    let parent = intersect.object;
 
-    // delete cube
-
-    if (isShiftDown) {
-
-      if (intersect.object !== plane) {
-
-        scene.remove(intersect.object);
-
-        objects.splice(objects.indexOf(intersect.object), 1);
-
-      }
-
-      // create cube
-
-    } else {
-
-      // const voxel = new THREE.Mesh(cubeGeo, cubeMaterial);
-      // voxel.position.copy(intersect.point).add(intersect.face.normal);
-      // voxel.position.divideScalar(50).floor().multiplyScalar(50).addScalar(25);
-      // scene.add(voxel);
-
-      // objects.push(voxel);
-
-
-      const loader = new GLTFLoader();
-
-      loader.load('assets/models/pawn.glb', function (gltf) {
-        console.log("Model loaded")
-        const piece = gltf.scene;
-        piece.position.copy(intersect.point).add(intersect.face.normal);
-        piece.scale.set(10, 10, 10)
-        piece.position.divideScalar(50).floor().multiplyScalar(50).addScalar(25);
-
-        scene.add(piece);
-        objects.push(piece);
-
-      }, undefined, function (error) {
-
-        console.error(error);
-
-      });
-
-
-
-
+    while (parent.parent && parent.parent.type !== "Scene") {
+      parent = parent.parent;
     }
+    const position = parent.position;
+    console.log('Position de la piece cliqué :', position);
 
-    render();
-
+    if ( selectedPiece && selectedPiece.position !== parent.position ) {
+      console.log("------------- MIAM PIECE -----------------");
+      
+      if (objects.includes(parent)) {
+        const index = objects.indexOf(parent);
+        if (index > -1) {
+          objects.splice(index, 1);
+          scene.remove(parent);
+        }
+      }
+      if (!hitSound.isPlaying) {
+        hitSound.play();
+      }
+      selectedPiece.position.set(position.x, selectedPiece.position.y, position.z);
+      selectedPiece.traverse(child => {
+        if (child.isMesh) {
+          child.material.color.set(originColor);
+        }
+      });
+      selectedPiece = null;
+    }
+    else {
+      originColor = intersect.object.material.color.getHex();;
+      intersect.object.material.color.set(0x2edc12);  
+      selectedPiece = parent;
+      if (!clickSound.isPlaying) {
+        clickSound.play();
+      }
+      animateJump(selectedPiece);
+    }
+    return;
   }
 
-}
+  // CLICK SUR UNE CASE
 
-function onDocumentKeyDown(event) {
+  const intersects = raycaster.intersectObjects(cases);
+  if (intersects.length > 0 && selectedPiece) {
+    const intersect = intersects[0];
+    const position = intersect.object.position;
+    console.log("------------------ CASE ------------------");
+    console.log('Position de la case cliqué :', position);
 
-  switch (event.keyCode) {
-
-    case 16: isShiftDown = true; break;
-
+    selectedPiece.position.set(position.x, selectedPiece.position.y, position.z);
+    selectedPiece.traverse(child => {
+      if (child.isMesh) {
+        child.material.color.set(originColor);
+      }
+    });
+    selectedPiece = null;
   }
-
+  controls.enabled = true;
 }
 
-function onDocumentKeyUp(event) {
-
-  switch (event.keyCode) {
-
-    case 16: isShiftDown = false; break;
-
-  }
-
-}
-
-function render() {
-
+/** ************************** UTILS ***************************** */
+const animation = () => {
+  renderer.setAnimationLoop(animation);
   renderer.render(scene, camera);
+};
 
+function onWindowResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
 }
+
+function printGraph(obj) {
+  console.group(' <%o> ' + obj.name, obj);
+  obj.children.forEach(printGraph);
+  console.groupEnd();
+}
+
+/** ************************** BOUCLE ANIMATION ***************************** */
+animation();
+window.addEventListener('resize', onWindowResize, false);
+
+
+
+

@@ -1,5 +1,6 @@
 {
-  "name": "three_vite",
+  "name": "three_chess",
+  "homepage": "https://vpech77.github.io/chess-threejs/",
   "version": "0.0.5",
   "author": "fdoganis",
   "license": "MIT",
@@ -11,11 +12,15 @@
     "clean": "rm -rf dist",
     "purge": "npm run clean && rm -rf node_modules",
     "serve": "http-server dist",
-    "cloud": "cloudflared --url http://localhost:5173/"
+    "cloud": "cloudflared --url http://localhost:5173/",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "devDependencies": {
     "@types/three": "^0.173.0",
+    "gh-pages": "^6.3.0",
     "http-server": "^14.1.1",
+    "lil-gui": "^0.20.0",
     "vite": "^5.4.14",
     "vite-plugin-glsl": "^1.3.0",
     "vite-plugin-static-copy": "^1.0.6"
