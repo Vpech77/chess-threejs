@@ -21,3 +21,8 @@ Install [Node.js](https://nodejs.org)
 - Rook by Poly by Google [CC-BY] via Poly Pizza
 - Queen by Poly by Google [CC-BY] via Poly Pizza
 - King by Poly by Google [CC-BY] via Poly Pizza
+
+## Music and Sound effects
+
+- White Noise from Silent Hill 2
+- Hit punch [CC-BY](http://freesound.org/people/CGEffex/sounds/98341/)
