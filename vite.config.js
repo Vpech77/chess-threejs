@@ -3,7 +3,7 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 import glsl from 'vite-plugin-glsl';
 
 export default defineConfig({
-    base: "/chess_threejs/",
+    base: "/chess-threejs/",
     clearScreen: false,
     optimizeDeps: {
         esbuildOptions: {
